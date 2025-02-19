@@ -1,0 +1,29 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{hinodeji}[2025/02/19 ひので字変換styファイル]
+
+\usepackage{luacode}
+% \usepackage{fontspec}
+\usepackage[no-math,deluxe,expert,haranoaji]{luatexja-preset}
+
+\newjfontfamily{\setHinodeji}{NKC02 Hinodeji}
+
+\begin{luacode*}
+function mecab_yomi(text)
+    local edited = text:gsub("\n", " \\par ")
+    local handle = io.popen("echo \"" .. edited .. "\" | mecab -Oyomi", "r")
+    if handle then
+        local result = handle:read("*a")
+        handle:close()
+        result = result:gsub("%s+$", "") -- 余計な改行・空白を削除
+        return result
+    else
+        return "(エラー)"
+    end
+end
+\end{luacode*}
+
+\newcommand{\MecabYomi}[1]{%
+  \directlua{ tex.sprint(mecab_yomi([[#1]])) }
+}
+
+\newcommand{\hinodeji}[1]{ { \MecabYomi{#1}} }
