@@ -5,9 +5,56 @@
 % \usepackage{fontspec}
 \usepackage[no-math,deluxe,expert,haranoaji]{luatexja-preset}
 
-\newjfontfamily{\setHinodeji}{NKC02 Hinodeji}
+% \newjfontfamily{\setHinodeji}{NKC02 Hinodeji}
+\newjfontfamily{\setHinodeji}[Scale=MatchLowercase]{NKC02 Hinodeji}
 
 \begin{luacode*}
+-- 長音記号「ー」を前の文字の母音に置換する関数
+function replace_long_vowel(text)
+    local vowels = {
+        -- 基本のカタカナ
+        ["ア"] = "ア", ["イ"] = "イ", ["ウ"] = "ウ", ["エ"] = "エ", ["オ"] = "オ",
+        ["カ"] = "ア", ["キ"] = "イ", ["ク"] = "ウ", ["ケ"] = "エ", ["コ"] = "オ",
+        ["サ"] = "ア", ["シ"] = "イ", ["ス"] = "ウ", ["セ"] = "エ", ["ソ"] = "オ",
+        ["タ"] = "ア", ["チ"] = "イ", ["ツ"] = "ウ", ["テ"] = "エ", ["ト"] = "オ",
+        ["ナ"] = "ア", ["ニ"] = "イ", ["ヌ"] = "ウ", ["ネ"] = "エ", ["ノ"] = "オ",
+        ["ハ"] = "ア", ["ヒ"] = "イ", ["フ"] = "ウ", ["ヘ"] = "エ", ["ホ"] = "オ",
+        ["マ"] = "ア", ["ミ"] = "イ", ["ム"] = "ウ", ["メ"] = "エ", ["モ"] = "オ",
+        ["ヤ"] = "ア",               ["ユ"] = "ウ",               ["ヨ"] = "オ",
+        ["ラ"] = "ア", ["リ"] = "イ", ["ル"] = "ウ", ["レ"] = "エ", ["ロ"] = "オ",
+        ["ワ"] = "ア",                             ["ヲ"] = "オ", ["ン"] = "ン",
+        ["ガ"] = "ア", ["ギ"] = "イ", ["グ"] = "ウ", ["ゲ"] = "エ", ["ゴ"] = "オ",
+        ["ザ"] = "ア", ["ジ"] = "イ", ["ズ"] = "ウ", ["ゼ"] = "エ", ["ゾ"] = "オ",
+        ["ダ"] = "ア", ["ヂ"] = "イ", ["ヅ"] = "ウ", ["デ"] = "エ", ["ド"] = "オ",
+        ["バ"] = "ア", ["ビ"] = "イ", ["ブ"] = "ウ", ["ベ"] = "エ", ["ボ"] = "オ",
+        ["パ"] = "ア", ["ピ"] = "イ", ["プ"] = "ウ", ["ペ"] = "エ", ["ポ"] = "オ",
+
+        -- 小さい文字の対応
+        ["ァ"] = "ア", ["ィ"] = "イ", ["ゥ"] = "ウ", ["ェ"] = "エ", ["ォ"] = "オ",
+        ["ャ"] = "ア", ["ュ"] = "ウ", ["ョ"] = "オ", ["ッ"] = "ウ", -- 促音は「ウ」に統一
+    }
+
+    -- 文字列の長さを取得
+    local len = utf8.len(text)
+    if not len then return text end
+
+    -- 1文字ずつチェックしながら変換
+    local result = {}
+    local prev_char = nil  -- 直前のカタカナ
+    for uchar in text:gmatch(utf8.charpattern) do
+        if uchar == "ー" and prev_char then
+            -- 直前の文字がカタカナならその母音を取得
+            table.insert(result, vowels[prev_char] or uchar)
+        else
+            -- それ以外はそのまま追加
+            table.insert(result, uchar)
+        end
+        prev_char = uchar
+    end
+
+    return table.concat(result)
+end
+
 function mecab_yomi(text)
     local edited = text:gsub("\n", " \\par ")
     local handle = io.popen("echo \"" .. edited .. "\" | mecab -Oyomi", "r")
@@ -15,6 +62,7 @@ function mecab_yomi(text)
         local result = handle:read("*a")
         handle:close()
         result = result:gsub("%s+$", "") -- 余計な改行・空白を削除
+        result = replace_long_vowel(result) -- ここで長音記号を置換
         return result
     else
         return "(エラー)"
@@ -26,4 +74,4 @@ end
   \directlua{ tex.sprint(mecab_yomi([[#1]])) }
 }
 
-\newcommand{\hinodeji}[1]{ {\setHinodeji \MecabYomi{#1}} }
+\newcommand{\hinodeji}[1]{ { \MecabYomi{#1}} }
