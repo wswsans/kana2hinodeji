@@ -74,4 +74,4 @@ end
   \directlua{ tex.sprint(mecab_yomi([[#1]])) }
 }
 
-\newcommand{\hinodeji}[1]{ { \MecabYomi{#1}} }
+\newcommand{\hinodeji}[1]{ {\setHinodeji \MecabYomi{#1}} }
