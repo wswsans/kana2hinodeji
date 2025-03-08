@@ -5,8 +5,10 @@
 % \usepackage{fontspec}
 \usepackage[no-math,deluxe,expert,haranoaji]{luatexja-preset}
 
-% \newjfontfamily{\setHinodeji}{NKC02 Hinodeji}
-\newjfontfamily{\setHinodeji}[Scale=MatchLowercase]{NKC02 Hinodeji}
+\newjfontfamily{\setHinodeji}{NKC02 Hinodeji}[
+    Scale=MatchLowercase,
+    FakeStretch=1,
+]
 
 \begin{luacode*}
 -- 長音記号「ー」を前の文字の母音に置換する関数
@@ -33,6 +35,31 @@ function replace_long_vowel(text)
         ["ァ"] = "ア", ["ィ"] = "イ", ["ゥ"] = "ウ", ["ェ"] = "エ", ["ォ"] = "オ",
         ["ャ"] = "ア", ["ュ"] = "ウ", ["ョ"] = "オ", ["ッ"] = "ウ", -- 促音は「ウ」に統一
     }
+    local static_insertion_space = 5.0
+    local static_insertions = {
+        ["ア"] = true, ["イ"] = true, ["ウ"] = true, ["エ"] = true, ["オ"] = true,
+        ["カ"] = true, ["キ"] = true, ["ク"] = true, ["ケ"] = true, ["コ"] = true,
+        ["サ"] = true, ["シ"] = true, ["ス"] = true, ["セ"] = true, ["ソ"] = true,
+        ["タ"] = true, ["チ"] = true, ["ツ"] = true, ["テ"] = true, ["ト"] = true,
+        ["ナ"] = true, ["ニ"] = true, ["ヌ"] = true, ["ネ"] = true, ["ノ"] = true,
+        ["ハ"] = true, ["ヒ"] = true, ["フ"] = true, ["ヘ"] = true, ["ホ"] = true,
+        ["ミ"] = true, ["ム"] = true, ["メ"] = true, ["モ"] = true,
+        ["ヤ"] = true, ["ユ"] = true, ["ヨ"] = true,
+        ["ラ"] = true, ["リ"] = true, ["ル"] = true, ["レ"] = true,
+        ["ワ"] = true, ["ヰ"] = true, ["ヱ"] = true, ["ヲ"] = true, ["ン"] = true,
+        ["ガ"] = true, ["ギ"] = true, ["グ"] = true, ["ゲ"] = true, ["ゴ"] = true,
+        ["ザ"] = true, ["ジ"] = true, ["ズ"] = true, ["ゼ"] = true, ["ゾ"] = true,
+        ["ダ"] = true, ["ヂ"] = true, ["ヅ"] = true, ["デ"] = true, ["ド"] = true,
+        ["バ"] = true, ["ビ"] = true, ["ブ"] = true, ["ベ"] = true, ["ボ"] = true,
+        ["パ"] = true, ["ピ"] = true, ["プ"] = true, ["ペ"] = true, ["ポ"] = true,
+        ["ァ"] = true, ["ィ"] = true, ["ゥ"] = true, ["ェ"] = true, ["ォ"] = true,
+        ["ッ"] = true,
+        ["ャ"] = true, ["ュ"] = true, ["ョ"] = true, ["ヮ"] = true,
+    }
+    local custom_insertions = {
+        ["マ"] = 0.0, ["ロ"] = 1.5
+    }
+
 
     -- 文字列の長さを取得
     local len = utf8.len(text)
@@ -49,20 +76,41 @@ function replace_long_vowel(text)
             -- それ以外はそのまま追加
             table.insert(result, uchar)
         end
+        -- hspace追加
+        if static_insertions[uchar] then
+            table.insert(result, "\\hspace{-" .. static_insertion_space .. "px}")
+            -- table.insert(result, "\\hspace{-1.5px}")
+        end
+        if custom_insertions[uchar] then
+            table.insert(result, "\\hspace{-" .. custom_insertions[uchar] .. "px}")
+        end
         prev_char = uchar
     end
 
     return table.concat(result)
 end
 
-function mecab_yomi(text)
-    local edited = text:gsub("\n", " \\par ")
-    local handle = io.popen("echo \"" .. edited .. "\" | mecab -Oyomi", "r")
+function mecab_yomi(text, iswakati, ismodify)
+    local true_word = {
+        ["true"] = true, ["1"] = true, [true] = true
+    }
+    local cmd_text = "echo \"" .. text .. "\" | mecab -Oyomi"
+    if true_word[iswakati] then
+        cmd_text = "echo \"" .. text .. "\" | mecab -Owakati | mecab -Oyomi"
+    end
+    local handle = io.popen(cmd_text, "r")
     if handle then
         local result = handle:read("*a")
         handle:close()
-        result = result:gsub("%s+$", "") -- 余計な改行・空白を削除
-        result = replace_long_vowel(result) -- ここで長音記号を置換
+        -- 余計な改行・空白を削除
+        result = string.gsub(result, "^ ", "")
+        result = string.gsub(result, "%s+$", "")
+        -- スペースの幅を増やす
+        result = string.gsub(result, " ", "\\hspace{5px}")
+        if true_word[ismodify] then
+            -- いろいろ修正
+            result = replace_long_vowel(result)
+        end
         return result
     else
         return "(エラー)"
@@ -70,8 +118,8 @@ function mecab_yomi(text)
 end
 \end{luacode*}
 
-\newcommand{\MecabYomi}[1]{%
-  \directlua{ tex.sprint(mecab_yomi([[#1]])) }
+\newcommand{\MecabYomi}[2][true]{%
+  \directlua{ tex.sprint( mecab_yomi([[#2]], [[#1]], true) ) }
 }
 
-\newcommand{\hinodeji}[1]{ {\setHinodeji \MecabYomi{#1}} }
+\newcommand{\hinodeji}[2][true]{ {\setHinodeji \MecabYomi[#1]{#2}} }
